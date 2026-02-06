@@ -1,0 +1,58 @@
+name: Build Crypto++ (lib + headers)
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y build-essential
+      - name: Build (Linux)
+        run: |
+          make -j$(nproc)
+          ls -l
+      - name: Package artifact
+        run: |
+          mkdir -p out/include out/lib
+          cp -r *.h out/include || true
+          cp libcryptopp.a out/lib/ || true
+          tar -czf cryptopp-linux.tar.gz -C out .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cryptopp-linux
+          path: cryptopp-linux.tar.gz
+
+  build-windows-msys2:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            mingw-w64-x86_64-toolchain
+      - name: Build (MSYS2 MinGW64)
+        shell: msys2 {0}
+        run: |
+          pacman -Sy --noconfirm
+          pacman -S --noconfirm mingw-w64-x86_64-toolchain
+          cd "$GITHUB_WORKSPACE"
+          mingw32-make -j$(nproc)
+          ls -l
+      - name: Package artifact (windows)
+        shell: bash
+        run: |
+          mkdir -p out/include out/lib
+          cp *.h out/include || true
+          cp libcryptopp.a out/lib/ || true
+          7z a cryptopp-windows.zip out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cryptopp-windows
+          path: cryptopp-windows.zip
